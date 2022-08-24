@@ -3,7 +3,6 @@ package pool
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -27,12 +26,18 @@ type idleResource[T any] struct {
 }
 
 type ResourcePool[T any] struct {
-	creator        CreatorFunc[T]
-	maxIdleSize    int
-	maxIdleTime    time.Duration
+	// creator, maxIdleSize, maxIdleTime are basic configurations set from func New
+	creator     CreatorFunc[T]
+	maxIdleSize int
+	maxIdleTime time.Duration
+
+	// idleResourceCh is a buffered channel to store released resources temporarily
 	idleResourceCh chan idleResource[T]
+
+	// acquiredSizeCh is a buffered channel to record how many resources are acquired
 	acquiredSizeCh chan bool
-	locker         sync.Mutex
+
+	locker sync.Mutex
 }
 
 // New
@@ -44,8 +49,8 @@ func New[T any](creator CreatorFunc[T], maxIdleSize int, maxIdleTime time.Durati
 		creator:        creator,
 		maxIdleSize:    maxIdleSize,
 		maxIdleTime:    maxIdleTime,
-		idleResourceCh: make(chan idleResource[T], maxIdleSize), // 紀錄還回去幾個
-		acquiredSizeCh: make(chan bool, maxIdleSize),            // 紀錄被拿幾個
+		idleResourceCh: make(chan idleResource[T], maxIdleSize),
+		acquiredSizeCh: make(chan bool, maxIdleSize),
 		locker:         sync.Mutex{},
 	}
 
@@ -57,8 +62,9 @@ func (rp *ResourcePool[T]) Acquire(ctx context.Context) (resource T, err error) 
 	rp.locker.Lock()
 	defer rp.locker.Unlock()
 
+	// take an idle resource
 	select {
-	case idle := <-rp.idleResourceCh: // 從閒置資源拿
+	case idle := <-rp.idleResourceCh:
 		rp.acquiredSizeCh <- true
 		resource = idle.value
 		return
@@ -75,7 +81,7 @@ Loop:
 				<-rp.acquiredSizeCh
 			}
 			return
-		default: // 使用中資源數量大於限制
+		default:
 			if time.Now().After(timeout) {
 				err = errors.New("acquisition timeout error")
 				return
@@ -105,17 +111,13 @@ func (rp *ResourcePool[T]) NumIdle() int {
 
 func (rp *ResourcePool[T]) sweepIdleResource() {
 	for {
-		// 避免 Acquire() 拿不到閒置資源
 		rp.locker.Lock()
 
 		select {
 		case resource := <-rp.idleResourceCh:
-
-			// 檢查資源過期
+			// If an idle resource is not expired, then return it back
 			if time.Now().Before(resource.sweepTime) {
 				rp.idleResourceCh <- resource
-			} else {
-				fmt.Println("sweep", &resource)
 			}
 		default:
 		}
