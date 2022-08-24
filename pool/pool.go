@@ -55,15 +55,6 @@ func New[T any](creator CreatorFunc[T], maxIdleSize int, maxIdleTime time.Durati
 
 func (rp *ResourcePool[T]) Acquire(ctx context.Context) (resource T, err error) {
 	rp.locker.Lock()
-	/*
-		defer func() {
-			if any(resource) != nil {
-				go rp.listenCtxDone(ctx, resource)
-			}
-
-			rp.locker.Unlock()
-		}()
-	*/
 	defer rp.locker.Unlock()
 
 	select {
@@ -132,17 +123,3 @@ func (rp *ResourcePool[T]) sweepIdleResource() {
 		rp.locker.Unlock()
 	}
 }
-
-/*
-func (rp *ResourcePool[T]) listenCtxDone(ctx context.Context, resource T) {
-	for {
-		select {
-		case <-ctx.Done():
-			fmt.Println("release resource", &resource)
-			rp.Release(resource)
-			return
-		default:
-		}
-	}
-}
-*/
