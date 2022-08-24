@@ -40,11 +40,26 @@ type ResourcePool[T any] struct {
 	locker sync.Mutex
 }
 
+const (
+	defaultMaxIdleSize = 5
+	defaultMaxIdleTime = 1 * time.Second
+	acquisitionTimeout = 2 * time.Second
+)
+
+var ErrAcquistionTimeout = errors.New("acquisition timeout")
+
 // New
 // creator is a function called by the pool to create a resource
 // maxIdleSize is the number of maximum idle items kept in the pool
 // maxIdleTime is the maximum idle time for an idle item to be swept from the pool
 func New[T any](creator CreatorFunc[T], maxIdleSize int, maxIdleTime time.Duration) Pool[T] {
+	if maxIdleSize <= 0 {
+		maxIdleSize = defaultMaxIdleSize
+	}
+	if maxIdleTime <= 0 {
+		maxIdleTime = defaultMaxIdleTime
+	}
+
 	rp := &ResourcePool[T]{
 		creator:        creator,
 		maxIdleSize:    maxIdleSize,
@@ -71,7 +86,7 @@ func (rp *ResourcePool[T]) Acquire(ctx context.Context) (resource T, err error) 
 	default:
 	}
 
-	timeout := time.Now().Add(3 * time.Second)
+	timeout := time.Now().Add(acquisitionTimeout)
 
 Loop:
 	for {
@@ -83,7 +98,7 @@ Loop:
 			return
 		default:
 			if time.Now().After(timeout) {
-				err = errors.New("acquisition timeout error")
+				err = ErrAcquistionTimeout
 				return
 			}
 			goto Loop
