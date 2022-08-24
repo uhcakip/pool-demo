@@ -47,8 +47,8 @@ subgraph Resource Pool
 direction LR
   subgraph Buffered Channel
   direction LR
-    idleResource[["IdleResource<hr><small>storing released resources temporarily</small>"]]
-    acquiredSize[["AcquiredSize<hr><small>recording how many resources are acquired</small>"]]
+    idleResource[["IdleResource<hr><small>storing released resources</small>"]]
+    acquiredSize[["AcquiredSize<hr><small>recording amount of acquired resources</small>"]]
   end
   
   subgraph Acquire

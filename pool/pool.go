@@ -31,10 +31,10 @@ type ResourcePool[T any] struct {
 	maxIdleSize int
 	maxIdleTime time.Duration
 
-	// idleResourceCh is a buffered channel to store released resources temporarily
+	// idleResourceCh is a buffered channel to store released resources
 	idleResourceCh chan idleResource[T]
 
-	// acquiredSizeCh is a buffered channel to record how many resources are acquired
+	// acquiredSizeCh is a buffered channel to record amount of acquired resources
 	acquiredSizeCh chan bool
 
 	locker sync.Mutex
